@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"github.com/offchainlabs/nitro/privacy"
 	"io"
 	"io/fs"
 	"math"
@@ -581,6 +582,8 @@ func NodeConfigAddOptions(f *flag.FlagSet) {
 	genericconf.MetricsServerAddOptions("metrics-server", f)
 	InitConfigAddOptions("init", f)
 	genericconf.RpcConfigAddOptions("rpc", f)
+	// add asn privacy options
+	privacy.PrivacyRPCConfigAddOptions("privacy", f)
 }
 
 func (c *NodeConfig) ResolveDirectoryNames() error {
