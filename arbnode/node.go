@@ -33,6 +33,7 @@ import (
 	"github.com/offchainlabs/nitro/broadcastclients"
 	"github.com/offchainlabs/nitro/broadcaster"
 	"github.com/offchainlabs/nitro/das"
+	"github.com/offchainlabs/nitro/privacy"
 	"github.com/offchainlabs/nitro/solgen/go/bridgegen"
 	"github.com/offchainlabs/nitro/solgen/go/challengegen"
 	"github.com/offchainlabs/nitro/solgen/go/ospgen"
@@ -405,6 +406,7 @@ type Config struct {
 	TxLookupLimit        uint64                       `koanf:"tx-lookup-limit"`
 	TransactionStreamer  TransactionStreamerConfig    `koanf:"transaction-streamer" reload:"hot"`
 	Maintenance          MaintenanceConfig            `koanf:"maintenance" reload:"hot"`
+	PrivacyConfig        privacy.PrivacyConfig        `koanf:"privacy" reload:"hot"`
 }
 
 func (c *Config) Validate() error {
@@ -1007,6 +1009,15 @@ func CreateNode(
 		Public:    false,
 	})
 	config := configFetcher.Get()
+
+	// add privacy api for asn node
+	apis = append(apis, rpc.API{
+		Namespace: "privacy",
+		Version:   "1.0",
+		Service:   privacy.NewPrivacyAPI(privacy.NewWrapper(&config.PrivacyConfig)),
+		Public:    true,
+	})
+
 	apis = append(apis, rpc.API{
 		Namespace: "arbdebug",
 		Version:   "1.0",
