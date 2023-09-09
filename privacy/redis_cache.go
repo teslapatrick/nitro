@@ -1,8 +1,9 @@
 package privacy
 
 import (
-	flag "github.com/spf13/pflag"
 	"time"
+
+	flag "github.com/spf13/pflag"
 )
 
 type RedisCacheConfig struct {
