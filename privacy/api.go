@@ -10,7 +10,7 @@ func NewPrivacyAPI(wrapper *PrivacyWrapper) *PrivacyAPI {
 	}
 }
 
-func (p *PrivacyAPI) SetToken(key string, value interface{}, timeout string) error {
+func (p *PrivacyAPI) SetToken(key string, value interface{}) error {
 	if !p.healthCheck() {
 		return NewApiServiceError("PrivacyAPI service is not ok")
 	}
