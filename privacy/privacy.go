@@ -52,8 +52,7 @@ func RpcResponseMiddleware(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		//token := strings.Trim(r.Header.Get("Authorization"), "Bearer ")
-		//b := r.Body
+		startTime := time.Now()
 		pw := &PrivacyResponseWriter{
 			ResponseWriter: w,
 			buf:            bytes.Buffer{},
@@ -76,6 +75,19 @@ func RpcResponseMiddleware(next http.Handler) http.Handler {
 			writer = gzip.NewWriter(pw.ResponseWriter)
 			defer writer.(*gzip.Writer).Close()
 			// marshal data
+			responseData, _ = io.ReadAll(&pw.buf)
+
+		} else {
+			next.ServeHTTP(pw, r)
+			if pw.Status == 0 {
+				pw.Status = http.StatusOK
+			}
+			responseData = pw.buf.Bytes()
+		}
+
+		writer.Write(responseData)
+
+		log.Printf("%s %s %d %s", r.Method, r.RequestURI, pw.Status, time.Since(startTime))
 	})
 }
 
