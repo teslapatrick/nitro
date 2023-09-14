@@ -2,10 +2,10 @@ package privacy
 
 import (
 	"context"
-	"github.com/allegro/bigcache"
-	"github.com/offchainlabs/nitro/das/dastree"
-	flag "github.com/spf13/pflag"
 	"time"
+
+	"github.com/allegro/bigcache"
+	flag "github.com/spf13/pflag"
 )
 
 type BigCacheConfig struct {
@@ -52,7 +52,6 @@ func NewBigCache(config BigCacheConfig) (ICacheService, error) {
 
 // Set sets the key-value pair for the auth service
 func (bc *BigCacheStorageService) Set(ctx context.Context, key string, value []byte, expiration uint64) (err error) {
-	//log.Printf("BigCacheStorageService.Set(%s, %v, %d)\n", key, value, expiration)
 	select {
 	case <-ctx.Done():
 		// in case the context is cancelled, return the error
@@ -66,7 +65,6 @@ func (bc *BigCacheStorageService) Set(ctx context.Context, key string, value []b
 
 // Get returns the value for the given key
 func (bc *BigCacheStorageService) Get(ctx context.Context, key string) (res []byte, err error) {
-	//fmt.Printf("BigCacheStorageService.Get(%s)\n", key)
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -81,6 +79,6 @@ func (bc *BigCacheStorageService) Get(ctx context.Context, key string) (res []by
 }
 
 func (bc *BigCacheStorageService) HealthCheck(ctx context.Context) bool {
-	_, err := bc.bigCache.Get(dastree.Hash([]byte(CheckStatusKey)).String())
+	_, err := bc.bigCache.Get(CheckStatusKey)
 	return err == nil
 }

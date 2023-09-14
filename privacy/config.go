@@ -22,6 +22,7 @@ var PrivacyRPCConfigDefault = PrivacyConfig{
 	RedisCache: RedisCacheConfigDefault,
 }
 
+// PrivacyRPCConfigAddOptions adds flags for configuring the privacy module.
 func PrivacyRPCConfigAddOptions(prefix string, f *flag.FlagSet) {
 	f.Bool(prefix+".enable", PrivacyRPCConfigDefault.Enable, "enable the privacy router")
 	f.StringSlice(prefix+".api", PrivacyRPCConfigDefault.API, "api list to support")

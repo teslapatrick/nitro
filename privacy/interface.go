@@ -10,6 +10,7 @@ type ICacheService interface {
 
 type IPrivacyAPI interface {
 	//CacheForTest() string
-	SetToken(key string, value interface{}) error
-	GetToken(key string) (interface{}, error)
+	SetToken(ctx context.Context, token string, addresses []string) (interface{}, error)
+	UpdateToken(ctx context.Context, token string, address string) (interface{}, error)
+	GetToken(ctx context.Context, address string) (interface{}, error)
 }
