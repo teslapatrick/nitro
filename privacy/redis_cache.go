@@ -1,8 +1,10 @@
 package privacy
 
 import (
-	flag "github.com/spf13/pflag"
+	"context"
 	"time"
+
+	flag "github.com/spf13/pflag"
 )
 
 type RedisCacheConfig struct {
@@ -26,14 +28,14 @@ func RedisCacheConfigAddOptions(prefix string, f *flag.FlagSet) {
 	f.Duration(prefix+".refresh-duration", RedisCacheConfigDefault.Refresh, "redis cache refresh duration")
 }
 
-func (c *RedisCacheConfig) Set(key string, value interface{}) error {
+func (c *RedisCacheConfig) Set(ctx context.Context, key string, value []byte, expiration uint64) (err error) {
 	return nil
 }
 
-func (c *RedisCacheConfig) Get(key string) (interface{}, error) {
+func (c *RedisCacheConfig) Get(ctx context.Context, key string) (res []byte, err error) {
 	return nil, nil
 }
 
-func (c *RedisCacheConfig) Check() bool {
+func (c *RedisCacheConfig) HealthCheck(ctx context.Context) bool {
 	return false
 }

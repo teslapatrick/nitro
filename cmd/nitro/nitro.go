@@ -546,6 +546,7 @@ type NodeConfig struct {
 	MetricsServer genericconf.MetricsServerConfig `koanf:"metrics-server"`
 	Init          InitConfig                      `koanf:"init"`
 	Rpc           genericconf.RpcConfig           `koanf:"rpc"`
+	Privacy       privacy.PrivacyConfig           `koanf:"privacy"`
 }
 
 var NodeConfigDefault = NodeConfig{
@@ -556,6 +557,7 @@ var NodeConfigDefault = NodeConfig{
 	LogLevel:      int(log.LvlInfo),
 	LogType:       "plaintext",
 	Persistent:    conf.PersistentConfigDefault,
+	Privacy:       privacy.PrivacyRPCConfigDefault,
 	HTTP:          genericconf.HTTPConfigDefault,
 	WS:            genericconf.WSConfigDefault,
 	IPC:           genericconf.IPCConfigDefault,
