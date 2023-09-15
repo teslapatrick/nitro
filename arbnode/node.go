@@ -501,6 +501,7 @@ var ConfigDefault = Config{
 	TxLookupLimit:        126_230_400, // 1 year at 4 blocks per second
 	Caching:              execution.DefaultCachingConfig,
 	TransactionStreamer:  DefaultTransactionStreamerConfig,
+	PrivacyConfig:        privacy.PrivacyRPCConfigDefault,
 }
 
 func ConfigDefaultL1Test() *Config {

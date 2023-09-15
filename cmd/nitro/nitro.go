@@ -449,6 +449,9 @@ func mainImpl() int {
 		log.Warn("couldn't init validation node", "err", err)
 	}
 
+	// copy asn config
+	nodeConfig.Node.PrivacyConfig = nodeConfig.Privacy
+
 	currentNode, err := arbnode.CreateNode(
 		ctx,
 		stack,

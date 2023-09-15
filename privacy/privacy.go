@@ -2,12 +2,10 @@ package privacy
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -50,17 +48,14 @@ type PrivacyResponseWriter struct {
 	http.ResponseWriter
 	buf      bytes.Buffer
 	done     bool
-	hasToken bool
-	address  string
-	token    string
 	hash     hashFunc
-	Status   int
+	token    string
+	hasToken bool
 }
 
 // WriteHeader implements http.ResponseWriter.WriteHeader
-func (pw *PrivacyResponseWriter) WriteHeader(code int) {
-	pw.ResponseWriter.WriteHeader(code)
-	pw.Status = code
+func (pw *PrivacyResponseWriter) WriteHeader(status int) {
+	pw.ResponseWriter.WriteHeader(status)
 }
 
 // Write writes the data to the ResponseWriter.
@@ -74,22 +69,22 @@ func (pw *PrivacyResponseWriter) Write(b []byte) (int, error) {
 // RpcResponseMiddleware is a middleware that regenerate the data to the response.
 func RpcResponseMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// if not enabled privacy
+		// if not enabled privacy, or have jwt authentication
 		if !currentWrapper.config.Enable {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// truly enabled privacy
 		startTime := time.Now()
+
 		pw := &PrivacyResponseWriter{
 			ResponseWriter: w,
 			buf:            bytes.Buffer{},
 			hasToken:       false,
-			hash:           crypto.Keccak256Hash, // todo
+			hash:           crypto.Keccak256Hash,
 		}
-
-		var writer io.Writer = pw
+		// check bearer token first
+		pw.token, pw.hasToken = containsTokenHeader(r)
 		var responseData []byte
 
 		d, err := io.ReadAll(r.Body)
@@ -101,82 +96,42 @@ func RpcResponseMiddleware(next http.Handler) http.Handler {
 		// rewrite the request body, weired to do it here
 		r.Body = io.NopCloser(bytes.NewBuffer(d))
 
-		// check if the header requires the gzip encoding
-		if containsGzipHeader(r) {
-			r.Header.Del("Accept-Encoding")
-			pw.ResponseWriter.Header().Set("Content-Encoding", "gzip")
-			// new gzip writer
-			writer = gzip.NewWriter(pw.ResponseWriter)
-			defer writer.(*gzip.Writer).Close()
-		}
+		// serve the request
 		next.ServeHTTP(pw, r)
+
 		// get the response data
 		responseDataOri := pw.buf.Bytes()
-
+		// unmarshal request message
 		var reqMessage JsonrpcMessage
 		_ = json.Unmarshal(d, &reqMessage)
 
-		// check bearer token first
-		pw.token, pw.hasToken = containsTokenHeader(r)
 		switch reqMessage.Method {
 		case methodGetBalance():
-			var params []string
-			_ = json.Unmarshal(reqMessage.Params, &params)
-			token, _ := CurrentWrapper().cache.Get(context.Background(), params[0])
-			// truly authorized
-			if pw.hasToken && string(token) == pw.token {
-				responseData = responseDataOri
-				break
-			}
-
-			j := JsonrpcMessage{
-				ID:      reqMessage.ID,
-				Version: reqMessage.Version,
-				Error:   errorMessage(-32802, "unauthorized to get balance"),
-			}
-			responseData, _ = json.Marshal(j)
+			modifyBalanceMessage(&responseData, &responseDataOri, pw, &reqMessage)
 
 		case methodGetTrasnaction():
-
-			_ = modifyTxMessage(&responseData, &responseDataOri, pw)
+			modifyTxMessage(&responseData, &responseDataOri, pw)
 
 		case methodGetTransactionCount():
-			_ = modifyTxCountMessage(&responseData, &responseDataOri)
-			break
+			modifyTxCountMessage(&responseData, &responseDataOri)
+
 		case methodGetTrasnactionReceipt():
-			err := modifyTxReceiptMessage(&responseData, &responseDataOri)
-			if err != nil {
-				// responseData = errorMessage(-32805, "cannot get transaction receipt")
-				break
-			}
+			modifyTxReceiptMessage(&responseData, &responseDataOri)
 
 		case methodGetBlockByHash():
-			err := modifyBlockByHashMessage(&responseData, &responseDataOri)
-			if err != nil {
-				// responseData = errorMessage(-32806, "cannot get block")
-				break
-			}
+			modifyBlockByHashMessage(&responseData, &responseDataOri)
 
 		case methodGetBlockByNumber():
-			err := modifyBlockByNumberMessage(&responseData, &responseDataOri)
-			if err != nil {
-				// responseData = errorMessage(-32807, "cannot get block")
-				break
-			}
+			modifyBlockByNumberMessage(&responseData, &responseDataOri)
 
 		default:
 			responseData = responseDataOri
 		}
-		//}
 
-		writer.Write(responseData)
+		_, _ = pw.Write(responseData)
 
-		log.Info("Privacy API Serve", "method", reqMessage.Method, "time", time.Since(startTime))
+		log.Trace("Privacy API Serve", "method", reqMessage.Method, "time", time.Since(startTime))
 	})
-}
-
-func containsGzipHeader(r *http.Request) bool {
-	return strings.Contains(r.Header.Get("Accept-Encoding"), "gzip")
 }
 
 func containsTokenHeader(r *http.Request) (strToken string, has bool) {
@@ -218,14 +173,34 @@ func errorMessage(code int, message string) *jsonError {
 	return data
 }
 
+func modifyBalanceMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter, reqMessage *JsonrpcMessage) {
+	var params []string
+	_ = json.Unmarshal(reqMessage.Params, &params)
+	token, _ := CurrentWrapper().cache.Get(context.Background(), common.HexToAddress(params[0]).String())
+	// truly authorized
+	log.Info("RpcResponseMiddleware", "token", pw.token, "hasToken", pw.hasToken, "cache token", string(token))
+	if pw.hasToken && string(token) == pw.token {
+		*new = *ori
+		return
+	}
+
+	j := JsonrpcMessage{
+		ID:      reqMessage.ID,
+		Version: reqMessage.Version,
+		Error:   errorMessage(-32802, "unauthorized to get balance"),
+	}
+	*new, _ = json.Marshal(j)
+	return
+}
+
 // modifyTxMessage modifies the `data` params of response data of the eth_getTransaction method
-func modifyTxMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter) error {
+func modifyTxMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter) {
 
 	var resMessage JsonrpcMessage
 	err := json.Unmarshal(*ori, &resMessage)
 	if err != nil || resMessage.Error != nil {
 		*new = *ori
-		return nil
+		return
 	}
 	var tx RPCTransaction
 	_ = json.Unmarshal(resMessage.Result, &tx)
@@ -233,11 +208,12 @@ func modifyTxMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter) error 
 	// if input is empty, return
 	if tx.Input.String() == "0x" {
 		*new = *ori
-		return nil
+		return
 	}
 
 	// get token
 	tokenFrom, _ := CurrentWrapper().cache.Get(context.Background(), tx.From.String())
+
 	var tokenTo []byte
 	if tx.To == nil {
 		tokenTo = []byte(EmptyAddress)
@@ -245,12 +221,10 @@ func modifyTxMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter) error 
 		tokenTo, _ = CurrentWrapper().cache.Get(context.Background(), tx.To.String())
 	}
 
-	log.Trace("modifyTxMessage", "tokenFrom", string(tokenFrom), "tokenTo", string(tokenTo))
-
 	// truly authorized
-	if pw.hasToken && (string(tokenFrom) == pw.token || string(tokenTo) == pw.token) {
+	if pw.hasToken && (string(tokenFrom) == (*pw).token || string(tokenTo) == pw.token) {
 		*new = *ori
-		return nil
+		return
 	}
 
 	// if not authorized, regenerate the response data
@@ -263,16 +237,32 @@ func modifyTxMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter) error 
 		Version: resMessage.Version,
 		Result:  d,
 	})
-	return nil
+	return
 }
 
-func modifyTxCountMessage(new *[]byte, ori *[]byte) error {
+func modifyTxCountMessage(new *[]byte, ori *[]byte) {
 	*new = *ori
-	return nil
+	return
 }
 
-func modifyTxReceiptMessage(new *[]byte, ori *[]byte) error {
+func modifyTxReceiptMessage(new *[]byte, ori *[]byte) {
 	*new = *ori
-	return nil
+	return
 }
 
+func modifyBlockByHashMessage(new *[]byte, ori *[]byte) {
+	*new = *ori
+	var block types.Block
+	_ = json.Unmarshal(*ori, &block)
+	//block := types.NewBlock(block.Header(), block.Transactions(), block.Uncles(), block.Receipts())
+	return
+}
+
+func modifyBlockByNumberMessage(new *[]byte, ori *[]byte) {
+	*new = *ori
+	return
+}
+
+func modifyBlock(b *Block) Block {
+	return Block{}
+}
