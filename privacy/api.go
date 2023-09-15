@@ -2,6 +2,7 @@ package privacy
 
 import (
 	"context"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 type PrivacyAPI struct {
@@ -25,6 +26,7 @@ func (p *PrivacyAPI) SetToken(ctx context.Context, token string, addresses []str
 		if addr == "" {
 			return nil, NewSetTokenFailedError("address is empty")
 		}
+		addr = common.HexToAddress(addr).String()
 		if err := p.wrapper.cache.Set(ctx, addr, []byte(token), uint64(0)); err != nil {
 			return nil, NewSetTokenFailedError("PrivacyAPI: set token failed")
 		}
