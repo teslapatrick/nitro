@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -119,10 +118,10 @@ func RpcResponseMiddleware(next http.Handler) http.Handler {
 			modifyTxReceiptMessage(&responseData, &responseDataOri)
 
 		case methodGetBlockByHash():
-			modifyBlockByHashMessage(&responseData, &responseDataOri)
+			modifyBlockByHashMessage(&responseData, &responseDataOri, pw, &reqMessage)
 
 		case methodGetBlockByNumber():
-			modifyBlockByNumberMessage(&responseData, &responseDataOri)
+			modifyBlockByNumberMessage(&responseData, &responseDataOri, pw, &reqMessage)
 
 		default:
 			responseData = responseDataOri
@@ -182,6 +181,12 @@ func parseAddressFromReq(reqMessage *JsonrpcMessage) (string, error) {
 	}
 	// make sure the address is well formatted
 	return common.HexToAddress(params[0]).String(), nil
+}
+
+func parseHashAndFlagFromReq(reqMessage *JsonrpcMessage) (string, bool) {
+	var params []interface{}
+	_ = json.Unmarshal(reqMessage.Params, &params)
+	return params[0].(string), params[1].(bool)
 }
 
 func (pw *PrivacyResponseWriter) authorized(token []byte) bool {
@@ -274,19 +279,54 @@ func modifyTxReceiptMessage(new *[]byte, ori *[]byte) {
 	return
 }
 
-func modifyBlockByHashMessage(new *[]byte, ori *[]byte) {
-	*new = *ori
-	var block types.Block
-	_ = json.Unmarshal(*ori, &block)
-	//block := types.NewBlock(block.Header(), block.Transactions(), block.Uncles(), block.Receipts())
-	return
+func modifyBlockByHashMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter, reqMessage *JsonrpcMessage) {
+	var resMessage JsonrpcMessage
+	err := json.Unmarshal(*ori, &resMessage)
+	if err != nil || resMessage.Error != nil {
+		*new = *ori
+		return
+	}
+
+	var block RPCBlock
+	_ = json.Unmarshal(resMessage.Result, &block)
+
+	_, fullTx := parseHashAndFlagFromReq(reqMessage)
+	txs := make(Transactions, 0, len(block.Transactions))
+	if !fullTx {
+		*new = *ori
+	} else {
+		for _, tx := range block.Transactions {
+			// if input is empty, return
+			if tx.Input.String() == EmptyInput {
+				txs = append(txs, tx)
+				continue
+			}
+			// get token, `From` and `To`
+			tokenFrom, _ := getAddressToken(tx.From.String())
+			var tokenTo []byte
+			if tx.To == nil {
+				tokenTo = []byte(EmptyAddress)
+			} else {
+				tokenTo, _ = getAddressToken(tx.To.String())
+			}
+
+			// check authorization
+			if !pw.authorized(tokenFrom) && !pw.authorized(tokenTo) {
+				// if not authorized, regenerate the response data
+				txWithInputHash(pw.hash, &tx)
+			}
+			txs = append(txs, tx)
+		}
+		block.Transactions = txs
+		d, _ := json.Marshal(block)
+		*new, _ = json.Marshal(&JsonrpcMessage{
+			ID:      resMessage.ID,
+			Version: resMessage.Version,
+			Result:  d,
+		})
+	}
 }
 
-func modifyBlockByNumberMessage(new *[]byte, ori *[]byte) {
-	*new = *ori
-	return
-}
-
-func modifyBlock(b *Block) Block {
-	return Block{}
+func modifyBlockByNumberMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter, reqMessage *JsonrpcMessage) {
+	modifyBlockByHashMessage(new, ori, pw, reqMessage)
 }

@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"time"
-
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -49,9 +47,34 @@ type Transactions []RPCTransaction
 
 type Receipt types.Receipt
 
-type Block types.Block
+type RPCBlock struct {
+	BaseFeePerGas    string       `json:"baseFeePerGas"`
+	Difficulty       string       `json:"difficulty"`
+	ExtraData        string       `json:"extraData"`
+	GasLimit         string       `json:"gasLimit"`
+	GasUsed          string       `json:"gasUsed"`
+	Hash             string       `json:"hash"`
+	L1BlockNumber    string       `json:"l1BlockNumber"`
+	LogsBloom        string       `json:"logsBloom"`
+	Miner            string       `json:"miner"`
+	MixHash          string       `json:"mixHash"`
+	Nonce            string       `json:"nonce"`
+	Number           string       `json:"number"`
+	ParentHash       string       `json:"parentHash"`
+	ReceiptsRoot     string       `json:"receiptsRoot"`
+	SendCount        string       `json:"sendCount"`
+	SendRoot         string       `json:"sendRoot"`
+	Sha3Uncles       string       `json:"sha3Uncles"`
+	Size             string       `json:"size"`
+	StateRoot        string       `json:"stateRoot"`
+	Timestamp        string       `json:"timestamp"`
+	TotalDifficulty  string       `json:"totalDifficulty"`
+	Transactions     Transactions `json:"transactions"`
+	TransactionsRoot string       `json:"transactionsRoot"`
+	Uncles           []string     `json:"uncles"`
+}
 
-type Blocks []Block
+type Blocks []RPCBlock
 
 type JsonrpcMessage struct {
 	Version string          `json:"jsonrpc,omitempty"`
@@ -72,9 +95,4 @@ type AuthToken struct {
 	Token        string
 	Address      []string
 	CreationTime uint64
-}
-
-func new() {
-	block := Block{}
-	block.ReceivedAt = time.Now()
 }
