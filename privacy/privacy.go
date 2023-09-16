@@ -18,7 +18,7 @@ import (
 var currentWrapper *PrivacyWrapper
 
 const EmptyHash string = ""
-
+const EmptyInput string = "0x"
 const EmptyAddress string = ""
 
 type PrivacyWrapper struct {
@@ -113,7 +113,7 @@ func RpcResponseMiddleware(next http.Handler) http.Handler {
 			modifyTxMessage(&responseData, &responseDataOri, pw)
 
 		case methodGetTransactionCount():
-			modifyTxCountMessage(&responseData, &responseDataOri)
+			modifyTxCountMessage(&responseData, &responseDataOri, pw, &reqMessage)
 
 		case methodGetTrasnactionReceipt():
 			modifyTxReceiptMessage(&responseData, &responseDataOri)
@@ -128,7 +128,8 @@ func RpcResponseMiddleware(next http.Handler) http.Handler {
 			responseData = responseDataOri
 		}
 
-		_, _ = pw.Write(responseData)
+		// use gzip writer
+		_, _ = w.Write(responseData)
 
 		log.Trace("Privacy API Serve", "method", reqMessage.Method, "time", time.Since(startTime))
 	})
@@ -173,24 +174,42 @@ func errorMessage(code int, message string) *jsonError {
 	return data
 }
 
-func modifyBalanceMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter, reqMessage *JsonrpcMessage) {
+func parseAddressFromReq(reqMessage *JsonrpcMessage) (string, error) {
 	var params []string
-	_ = json.Unmarshal(reqMessage.Params, &params)
-	token, _ := CurrentWrapper().cache.Get(context.Background(), common.HexToAddress(params[0]).String())
+	err := json.Unmarshal(reqMessage.Params, &params)
+	if err != nil {
+		return "", err
+	}
+	// make sure the address is well formatted
+	return common.HexToAddress(params[0]).String(), nil
+}
+
+func (pw *PrivacyResponseWriter) authorized(token []byte) bool {
+	return pw.hasToken && string(token) == pw.token
+}
+
+func getAddressToken(addr string) ([]byte, error) {
+	return CurrentWrapper().cache.Get(context.Background(), addr)
+}
+
+func modifyBalanceMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter, reqMessage *JsonrpcMessage) {
+	addr, _ := parseAddressFromReq(reqMessage)
+	token, _ := getAddressToken(addr)
 	// truly authorized
 	log.Info("RpcResponseMiddleware", "token", pw.token, "hasToken", pw.hasToken, "cache token", string(token))
-	if pw.hasToken && string(token) == pw.token {
+	if pw.authorized(token) {
 		*new = *ori
-		return
+	} else {
+		*new, _ = json.Marshal(JsonrpcMessage{
+			ID:      reqMessage.ID,
+			Version: reqMessage.Version,
+			Error:   errorMessage(-32802, "unauthorized to get balance"),
+		})
 	}
+}
 
-	j := JsonrpcMessage{
-		ID:      reqMessage.ID,
-		Version: reqMessage.Version,
-		Error:   errorMessage(-32802, "unauthorized to get balance"),
-	}
-	*new, _ = json.Marshal(j)
-	return
+func txWithInputHash(hash hashFunc, tx *RPCTransaction) {
+	(*tx).Input = hash(tx.Input).Bytes()
 }
 
 // modifyTxMessage modifies the `data` params of response data of the eth_getTransaction method
@@ -206,43 +225,48 @@ func modifyTxMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter) {
 	_ = json.Unmarshal(resMessage.Result, &tx)
 
 	// if input is empty, return
-	if tx.Input.String() == "0x" {
+	if tx.Input.String() == EmptyInput {
 		*new = *ori
 		return
 	}
 
-	// get token
-	tokenFrom, _ := CurrentWrapper().cache.Get(context.Background(), tx.From.String())
-
+	// get token, `From` and `To`
+	tokenFrom, _ := getAddressToken(tx.From.String())
 	var tokenTo []byte
 	if tx.To == nil {
 		tokenTo = []byte(EmptyAddress)
 	} else {
-		tokenTo, _ = CurrentWrapper().cache.Get(context.Background(), tx.To.String())
+		tokenTo, _ = getAddressToken(tx.To.String())
 	}
 
-	// truly authorized
-	if pw.hasToken && (string(tokenFrom) == (*pw).token || string(tokenTo) == pw.token) {
+	// check authorization
+	if pw.authorized(tokenFrom) || pw.authorized(tokenTo) {
 		*new = *ori
-		return
+	} else {
+		// if not authorized, regenerate the response data
+		txWithInputHash(pw.hash, &tx)
+		d, _ := json.Marshal(tx)
+		*new, _ = json.Marshal(&JsonrpcMessage{
+			ID:      resMessage.ID,
+			Version: resMessage.Version,
+			Result:  d,
+		})
 	}
-
-	// if not authorized, regenerate the response data
-	input := pw.hash(tx.Input)
-	tx.Input = input.Bytes()
-	d, _ := json.Marshal(tx)
-
-	*new, _ = json.Marshal(&JsonrpcMessage{
-		ID:      resMessage.ID,
-		Version: resMessage.Version,
-		Result:  d,
-	})
-	return
 }
 
-func modifyTxCountMessage(new *[]byte, ori *[]byte) {
-	*new = *ori
-	return
+func modifyTxCountMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter, reqMessage *JsonrpcMessage) {
+	addr, _ := parseAddressFromReq(reqMessage)
+	token, _ := getAddressToken(addr)
+	// truly authorized
+	if pw.authorized(token) {
+		*new = *ori
+	} else {
+		*new, _ = json.Marshal(JsonrpcMessage{
+			ID:      reqMessage.ID,
+			Version: reqMessage.Version,
+			Error:   errorMessage(-32803, "unauthorized to get transaction count"),
+		})
+	}
 }
 
 func modifyTxReceiptMessage(new *[]byte, ori *[]byte) {
