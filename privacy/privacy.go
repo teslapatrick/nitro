@@ -129,6 +129,8 @@ func RpcResponseMiddleware(next http.Handler) http.Handler {
 		}
 
 		_, _ = pw.Write(responseData)
+		// use gzip writer
+		_, _ = w.Write(responseData)
 
 		log.Trace("Privacy API Serve", "method", reqMessage.Method, "time", time.Since(startTime))
 	})
