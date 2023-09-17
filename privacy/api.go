@@ -48,27 +48,24 @@ func (p *PrivacyAPI) SetToken(ctx context.Context, token string, addresses []str
 	// check signature
 	var addressesBytes = make([]byte, len(addresses)*common.AddressLength)
 	for i, addr := range addresses {
-		//fmt.Println("addr", common.HexToAddress(addr).Bytes())
 		copy(addressesBytes[i*common.AddressLength:], common.HexToAddress(addr).Bytes())
 	}
-
 	hash := crypto.Keccak256([]byte(token), addressesBytes)
 	if !p.validSignature(ctx, hash, sig) {
 		return nil, NewSignatureVerificationFailedError("signature is not valid")
 	}
-	//valid := p.checkSignature(ctx, hash, sig)
 	return p.set(ctx, token, addresses)
 }
 
-func (p *PrivacyAPI) UpdateToken(ctx context.Context, token string, addresses []string, sig string) (interface{}, error) {
-	if !p.healthCheck(ctx) {
-		return nil, NewApiServiceError("PrivacyAPI service is not ok")
-	}
-	if token == "" || len(addresses) == 0 {
-		return nil, NewApiServiceError("token or address is empty")
-	}
-	return p.set(ctx, token, addresses)
-}
+//func (p *PrivacyAPI) UpdateToken(ctx context.Context, token string, addresses []string, sig string) (interface{}, error) {
+//	if !p.healthCheck(ctx) {
+//		return nil, NewApiServiceError("PrivacyAPI service is not ok")
+//	}
+//	if token == "" || len(addresses) == 0 {
+//		return nil, NewApiServiceError("token or address is empty")
+//	}
+//	return p.set(ctx, token, addresses)
+//}
 
 func (p *PrivacyAPI) set(ctx context.Context, token string, addresses []string) (interface{}, error) {
 	for _, addr := range addresses {
