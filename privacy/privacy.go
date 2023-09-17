@@ -16,9 +16,8 @@ import (
 // var db ICacheService
 var currentWrapper *PrivacyWrapper
 
-const EmptyHash string = ""
 const EmptyInput string = "0x"
-const EmptyAddress string = ""
+const EmptyHashOrAddress string = ""
 
 type PrivacyWrapper struct {
 	config *PrivacyConfig
@@ -90,7 +89,7 @@ func RpcResponseMiddleware(next http.Handler) http.Handler {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
-		r.Body.Close()
+		_ = r.Body.Close()
 
 		// rewrite the request body, weired to do it here
 		r.Body = io.NopCloser(bytes.NewBuffer(d))
@@ -108,13 +107,13 @@ func RpcResponseMiddleware(next http.Handler) http.Handler {
 		case methodGetBalance():
 			modifyBalanceMessage(&responseData, &responseDataOri, pw, &reqMessage)
 
-		case methodGetTrasnaction():
+		case methodGetTransaction():
 			modifyTxMessage(&responseData, &responseDataOri, pw)
 
 		case methodGetTransactionCount():
 			modifyTxCountMessage(&responseData, &responseDataOri, pw, &reqMessage)
 
-		case methodGetTrasnactionReceipt():
+		case methodGetTransactionReceipt():
 			modifyTxReceiptMessage(&responseData, &responseDataOri)
 
 		case methodGetBlockByHash():
@@ -144,11 +143,11 @@ func methodGetBalance() string {
 	return "eth_getBalance"
 }
 
-func methodGetTrasnaction() string {
+func methodGetTransaction() string {
 	return "eth_getTransactionByHash"
 }
 
-func methodGetTrasnactionReceipt() string {
+func methodGetTransactionReceipt() string {
 	return "eth_getTransactionReceipt"
 }
 
@@ -239,7 +238,7 @@ func modifyTxMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter) {
 	tokenFrom, _ := getAddressToken(tx.From.String())
 	var tokenTo []byte
 	if tx.To == nil {
-		tokenTo = []byte(EmptyAddress)
+		tokenTo = []byte(EmptyHashOrAddress)
 	} else {
 		tokenTo, _ = getAddressToken(tx.To.String())
 	}
@@ -304,7 +303,7 @@ func modifyBlockByHashMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWrite
 			tokenFrom, _ := getAddressToken(tx.From.String())
 			var tokenTo []byte
 			if tx.To == nil {
-				tokenTo = []byte(EmptyAddress)
+				tokenTo = []byte(EmptyHashOrAddress)
 			} else {
 				tokenTo, _ = getAddressToken(tx.To.String())
 			}
