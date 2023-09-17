@@ -49,12 +49,15 @@ func (p *PrivacyAPI) SetToken(ctx context.Context, token string, addresses []str
 	var addressesBytes = make([]byte, len(addresses)*common.AddressLength)
 	for i, addr := range addresses {
 		//fmt.Println("addr", common.HexToAddress(addr).Bytes())
+		copy(addressesBytes[i*common.AddressLength:], common.HexToAddress(addr).Bytes())
 	}
 
+	hash := crypto.Keccak256([]byte(token), addressesBytes)
 	if !p.validSignature(ctx, hash, sig) {
 		return nil, NewSignatureVerificationFailedError("signature is not valid")
 	}
 	//valid := p.checkSignature(ctx, hash, sig)
+	return p.set(ctx, token, addresses)
 }
 
 func (p *PrivacyAPI) UpdateToken(ctx context.Context, token string, addresses []string, sig string) (interface{}, error) {
