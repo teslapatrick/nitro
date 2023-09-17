@@ -276,7 +276,6 @@ func modifyTxCountMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter, r
 
 func modifyTxReceiptMessage(new *[]byte, ori *[]byte) {
 	*new = *ori
-	return
 }
 
 func modifyBlockByHashMessage(new *[]byte, ori *[]byte, pw *PrivacyResponseWriter, reqMessage *JsonrpcMessage) {
