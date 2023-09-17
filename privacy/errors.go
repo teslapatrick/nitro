@@ -34,3 +34,14 @@ func (e *getTokenFailed) ErrorCode() int { return -32803 }
 func NewGetTokenFailedError(msg string) *getTokenFailed {
 	return &getTokenFailed{msg: msg}
 }
+
+type SignatureVerificationFailed struct {
+	msg string
+}
+
+func (e *SignatureVerificationFailed) Error() string  { return e.msg }
+func (e *SignatureVerificationFailed) ErrorCode() int { return -32804 }
+
+func NewSignatureVerificationFailedError(msg string) *SignatureVerificationFailed {
+	return &SignatureVerificationFailed{msg: msg}
+}
