@@ -1,7 +1,7 @@
 package privacy
 
 type apiServiceError struct {
-	msg string `json:"message"`
+	msg string
 }
 
 const defaultPrivacyErrorCode = -32800
@@ -14,7 +14,7 @@ func NewApiServiceError(msg string) *apiServiceError {
 }
 
 type setTokenFailed struct {
-	msg string `json:"message"`
+	msg string
 }
 
 func (e *setTokenFailed) Error() string  { return e.msg }
@@ -25,7 +25,7 @@ func NewSetTokenFailedError(msg string) *setTokenFailed {
 }
 
 type getTokenFailed struct {
-	msg string `json:"message"`
+	msg string
 }
 
 func (e *getTokenFailed) Error() string  { return e.msg }
