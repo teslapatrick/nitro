@@ -1012,12 +1012,14 @@ func CreateNode(
 	config := configFetcher.Get()
 
 	// add privacy api for asn node
-	apis = append(apis, rpc.API{
-		Namespace: "privacy",
-		Version:   "1.0",
-		Service:   privacy.NewPrivacyAPI(privacy.NewWrapper(&config.PrivacyConfig)),
-		Public:    true,
-	})
+	if config.PrivacyConfig.Enable {
+		apis = append(apis, rpc.API{
+			Namespace: "privacy",
+			Version:   "1.0",
+			Service:   privacy.NewPrivacyAPI(privacy.NewWrapper(&config.PrivacyConfig)),
+			Public:    true,
+		})
+	}
 
 	apis = append(apis, rpc.API{
 		Namespace: "arbdebug",
