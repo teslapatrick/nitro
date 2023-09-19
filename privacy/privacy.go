@@ -68,7 +68,7 @@ func (pw *PrivacyResponseWriter) Write(b []byte) (int, error) {
 func RpcResponseMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// if not enabled privacy, or have jwt authentication
-		if !currentWrapper.config.Enable {
+		if currentWrapper == nil || !currentWrapper.config.Enable {
 			next.ServeHTTP(w, r)
 			return
 		}
